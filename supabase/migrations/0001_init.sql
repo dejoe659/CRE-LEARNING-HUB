@@ -219,7 +219,7 @@ create or replace function public.grade_attempt(p_exam uuid, p_answers jsonb, p_
 returns public.exam_attempts language plpgsql security definer set search_path = public as $$
 declare
   v_course uuid; v_score int := 0; v_total int := 0; r record; given text; ok boolean; kw text;
-  out public.exam_attempts;
+  result public.exam_attempts;
 begin
   select course_id into v_course from public.exams where id = p_exam and is_published;
   if v_course is null or not public.has_course_access(v_course) then raise exception 'not allowed'; end if;
@@ -239,10 +239,10 @@ begin
   if v_total = 0 then raise exception 'exam has no questions'; end if;
   insert into public.exam_attempts (user_id, exam_id, score, total, percent, duration_sec)
   values (auth.uid(), p_exam, v_score, v_total, round(100.0 * v_score / v_total), greatest(p_duration,0))
-  returning * into out;
-  return out;
+  returning * into result;
+  return result;
 end $$;
-revoke all on function public.grade_attempt(uuid, jsonb, int) from public;
+revoke all on function public.grade_attempt(uuid, jsonb, int) from public, anon;
 grant execute on function public.grade_attempt(uuid, jsonb, int) to authenticated;
 
 -- ---------- storage buckets (private) ----------
@@ -257,3 +257,22 @@ create policy "storage signed-in read" on storage.objects for select
 
 -- To make yourself the first admin, after registering run:
 --   update public.profiles set role = 'admin' where id = (select id from auth.users where email = 'YOU@example.com');
+
+-- ---------- indexes & function permissions (applied to the live project) ----------
+create index on public.modules (course_id);
+create index on public.lessons (module_id);
+create index on public.materials (course_id);
+create index on public.exams (course_id);
+create index on public.questions (exam_id);
+create index on public.enrollments (course_id);
+create index on public.lesson_progress (lesson_id);
+create index on public.exam_attempts (user_id);
+create index on public.exam_attempts (exam_id);
+create index on public.payments (user_id);
+create index on public.payments (course_id);
+
+revoke all on function public.is_admin() from public;
+grant execute on function public.is_admin() to anon, authenticated;
+revoke all on function public.has_course_access(uuid) from public;
+grant execute on function public.has_course_access(uuid) to anon, authenticated;
+revoke all on function public.handle_new_user() from public, anon, authenticated;
