@@ -34,7 +34,7 @@ export default function About() {
       <section className="section pb-20">
         <div className="rounded-3xl bg-amber-50 p-6 text-sm text-amber-900">
           <strong>Note on curriculum:</strong> the courses displayed are sample content for demonstration. They are not an
-          official university (including UNN) curriculum. Administrators add the real course catalogue from the admin dashboard.
+          official university (including UNN) curriculum. Administrators add the real course catalogue from the admin site.
         </div>
         <div className="mt-8 text-center">
           <Link href="/register" className="btn-primary px-8 py-3.5">Join CRE Learning Hub</Link>

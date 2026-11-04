@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import {
   Award, BarChart3, BookOpen, ClipboardList, Compass, FileText, LayoutDashboard, LogOut, Menu, PlayCircle,
-  Settings, ShieldCheck, Sparkles, User, X, Bot, HelpCircle,
+  Settings, Sparkles, User, X, Bot, HelpCircle,
 } from "lucide-react";
 import Logo from "./Logo";
 import { useAuth } from "@/lib/auth";
@@ -52,11 +52,6 @@ export default function Sidebar() {
             </Link>
           );
         })}
-        {user?.role === "admin" && (
-          <Link href="/admin" className="mt-3 flex items-center gap-3 rounded-xl border border-amber-400/30 px-3.5 py-2.5 text-sm font-medium text-amber-300 hover:bg-white/5">
-            <ShieldCheck size={18} /> Admin dashboard
-          </Link>
-        )}
       </nav>
       <div className="border-t border-white/10 p-3">
         <button

@@ -20,7 +20,7 @@ export default function LoginForm() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (user) router.replace(user.role === "admin" && !next ? "/admin" : safeNext);
+    if (user) router.replace(safeNext);
   }, [user, router, safeNext, next]);
 
   async function submit(e: React.FormEvent) {
