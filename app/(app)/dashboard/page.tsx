@@ -4,13 +4,17 @@ import Link from "next/link";
 import { ArrowRight, Award, BookOpen, CheckCircle2, Clock, PlayCircle, TrendingUp } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useProgress } from "@/lib/progress";
-import { COURSES, courseSlug, fmtDuration } from "@/lib/data";
+import { courseSlug, fmtDuration } from "@/lib/data";
+import { useContent } from "@/lib/content";
+import { useExams } from "@/lib/exams";
 import { courseProgress, findLesson, isCourseComplete, timeAgo } from "@/lib/stats";
 import CourseCard from "@/components/CourseCard";
 import { SceneThumb } from "@/components/LessonScene";
 
 export default function DashboardHome() {
   const { user } = useAuth();
+  const { courses: COURSES } = useContent();
+  const { exams } = useExams();
   const { enrolled, completed, recent, results, positions } = useProgress();
   const enrolledCourses = COURSES.filter((c) => enrolled.includes(c.code));
   const done = enrolledCourses.filter((c) => isCourseComplete(c, completed));
@@ -18,7 +22,7 @@ export default function DashboardHome() {
     ? Math.round(enrolledCourses.reduce((a, c) => a + courseProgress(c, completed), 0) / enrolledCourses.length)
     : 0;
   const recommended = COURSES.filter((c) => c.level === user?.level && !enrolled.includes(c.code)).slice(0, 3);
-  const upcoming = enrolledCourses.filter((c) => c.modules.some((m) => m.quiz.length)).slice(0, 4);
+  const upcoming = exams.filter((e) => enrolled.includes(e.courseCode) && e.timeLimitSec).slice(0, 4);
 
   const stats = [
     { label: "Enrolled courses", value: enrolledCourses.length, icon: BookOpen, tone: "bg-brand-50 text-brand-600" },
@@ -72,7 +76,7 @@ export default function DashboardHome() {
           <div className="card divide-y divide-slate-100">
             {recent.length === 0 && <p className="p-6 text-sm text-slate-500">Videos you watch will appear here.</p>}
             {recent.slice(0, 4).map((r) => {
-              const f = findLesson(r.lessonId);
+              const f = findLesson(COURSES, r.lessonId);
               if (!f) return null;
               return (
                 <Link key={r.lessonId} href={`/dashboard/learn/${courseSlug(f.course.code)}?lesson=${r.lessonId}`} className="flex items-center gap-4 p-4 transition hover:bg-slate-50">
@@ -93,10 +97,10 @@ export default function DashboardHome() {
           <h2 className="mb-4 text-lg font-bold">Upcoming examinations</h2>
           <div className="card divide-y divide-slate-100">
             {upcoming.length === 0 && <p className="p-6 text-sm text-slate-500">Enrol in a course to see its quizzes and examinations.</p>}
-            {upcoming.map((c) => (
-              <div key={c.code} className="flex items-center justify-between gap-3 p-4">
-                <div className="min-w-0"><p className="truncate text-sm font-semibold">{c.code} Examination</p><p className="flex items-center gap-1 text-xs text-slate-500"><Clock size={12} /> Timed · {c.modules.reduce((a, m) => a + m.quiz.length, 0)} questions</p></div>
-                <Link href={`/dashboard/quizzes?course=${courseSlug(c.code)}`} className="btn-outline px-3 py-2 text-xs">Start</Link>
+            {upcoming.map((e) => (
+              <div key={e.id} className="flex items-center justify-between gap-3 p-4">
+                <div className="min-w-0"><p className="truncate text-sm font-semibold">{e.courseCode} · {e.title}</p><p className="flex items-center gap-1 text-xs text-slate-500"><Clock size={12} /> Timed · {e.questions.length} questions</p></div>
+                <Link href={`/dashboard/quizzes?course=${courseSlug(e.courseCode)}`} className="btn-outline px-3 py-2 text-xs">Start</Link>
               </div>
             ))}
           </div>

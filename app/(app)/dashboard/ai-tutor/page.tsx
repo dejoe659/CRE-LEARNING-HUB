@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, Loader2, Send, Sparkles, Trash2, User } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { COURSES } from "@/lib/data";
+import { useContent } from "@/lib/content";
 import { getSupabase } from "@/lib/supabase/client";
 
 interface Msg { role: "user" | "assistant"; content: string; error?: boolean }
@@ -17,6 +17,7 @@ const SUGGESTIONS = [
 
 export default function AiTutor() {
   const { user } = useAuth();
+  const { courses: COURSES } = useContent();
   const key = `cre.tutor.${user?.id}`;
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");

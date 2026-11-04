@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle2, ClipboardList, Download, Upload } from "lucide-react";
-import { COURSES, MATERIALS } from "@/lib/data";
+import { useContent } from "@/lib/content";
+import { openMaterial, useMaterials } from "@/lib/materials";
 import { useAuth } from "@/lib/auth";
 import { useProgress } from "@/lib/progress";
 
@@ -11,6 +12,8 @@ interface Sub { id: string; text: string; fileName?: string; at: string }
 /** Assignments are the "Assignment" study materials. Submissions are saved per student in this browser until the DB is connected. */
 export default function Assignments() {
   const { user } = useAuth();
+  const { courses: COURSES } = useContent();
+  const { materials: MATERIALS } = useMaterials();
   const { enrolled } = useProgress();
   const key = `cre.assignments.${user?.id}`;
   const [subs, setSubs] = useState<Record<string, Sub>>({});
@@ -33,14 +36,17 @@ export default function Assignments() {
       <h1 className="text-2xl font-extrabold">Assignments</h1>
       <p className="mt-1 text-sm text-slate-500">Submit your work before the deadline set by your lecturer.</p>
       <div className="mt-6 space-y-4">
+        {items.length === 0 && <div className="card p-12 text-center text-sm text-slate-500">No assignments have been posted yet.</div>}
         {items.map((a) => {
-          const c = COURSES.find((x) => x.code === a.course)!;
+          const c = COURSES.find((x) => x.code === a.course);
+          if (!c) return null;
           const sub = subs[a.id];
           return (
             <div key={a.id} className="card p-5">
               <div className="flex flex-wrap items-center gap-4">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-amber-50 text-amber-600"><ClipboardList size={20} /></span>
                 <div className="min-w-0 flex-1"><p className="font-semibold">{a.title}</p><p className="text-xs text-slate-500">{a.course} · {c.title}{!enrolled.includes(a.course) && " · not enrolled"}</p></div>
+                {a.filePath && <button className="btn-outline px-3 py-2 text-xs" onClick={async () => { const u = await openMaterial(a.filePath!); if (u) window.open(u, "_blank", "noopener"); }}><Download size={14} /> Brief</button>}
                 {sub ? <span className="badge gap-1 bg-emerald-50 text-emerald-700"><CheckCircle2 size={13} /> Submitted</span> : <button className="btn-primary px-4 py-2 text-xs" onClick={() => setOpen(open === a.id ? null : a.id)}><Upload size={14} /> Submit</button>}
               </div>
               {open === a.id && (

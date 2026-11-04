@@ -1,4 +1,4 @@
-import { COURSES, Course, flatLessons } from "./data";
+import { Course, flatLessons } from "./data";
 
 export const courseProgress = (c: Course, completed: string[]) => {
   const ls = flatLessons(c);
@@ -8,8 +8,8 @@ export const courseProgress = (c: Course, completed: string[]) => {
 
 export const isCourseComplete = (c: Course, completed: string[]) => courseProgress(c, completed) === 100;
 
-export const findLesson = (lessonId: string) => {
-  for (const c of COURSES) {
+export const findLesson = (courses: Course[], lessonId: string) => {
+  for (const c of courses) {
     const l = flatLessons(c).find((x) => x.id === lessonId);
     if (l) return { course: c, lesson: l };
   }

@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { COURSES } from "@/lib/data";
+import { useContent } from "@/lib/content";
 import { useProgress } from "@/lib/progress";
 import { courseProgress } from "@/lib/stats";
 import CourseCard from "@/components/CourseCard";
 
 export default function MyCourses() {
+  const { courses: COURSES } = useContent();
   const { enrolled, completed } = useProgress();
   const mine = COURSES.filter((c) => enrolled.includes(c.code));
   return (

@@ -6,27 +6,68 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2, ChevronLeft, ChevronRight, Circle, Download, FileText, HelpCircle, Lock, PlayCircle, Target, Wrench,
 } from "lucide-react";
+import { Course, ExamItem } from "@/lib/data";
 import VideoPlayer from "@/components/VideoPlayer";
 import QuizRunner from "@/components/QuizRunner";
-import { courseSlug, flatLessons, fmtDuration, formatNaira, getCourse } from "@/lib/data";
+import { courseSlug, flatLessons, fmtDuration, formatNaira } from "@/lib/data";
+import { useContent } from "@/lib/content";
+import { useExams } from "@/lib/exams";
+import { getSupabase } from "@/lib/supabase/client";
 import { useProgress } from "@/lib/progress";
 import { courseProgress } from "@/lib/stats";
 
 type Tab = "overview" | "objectives" | "notes" | "practical" | "quiz";
 
 export default function Learn({ slug }: { slug: string }) {
-  const course = getCourse(slug)!;
+  const { bySlug, loading: contentLoading, sample } = useContent();
+  const { exams } = useExams();
+  const found = bySlug(slug);
+  if (!found)
+    return (
+      <div className="card mx-auto mt-10 max-w-lg p-10 text-center">
+        <h1 className="text-xl font-extrabold">{contentLoading ? "Loading course…" : "Course not found"}</h1>
+        {!contentLoading && <Link href="/dashboard/explore" className="btn-primary mt-6">Explore courses</Link>}
+      </div>
+    );
+  if (flatLessons(found).length === 0)
+    return <div className="card mx-auto mt-10 max-w-lg p-10 text-center text-sm text-slate-500">This course has no lessons yet. Please check back soon.</div>;
+  return <LearnInner course={found} slug={slug} exams={exams} sample={sample} />;
+}
+
+function LearnInner({ course, slug, exams, sample }: { course: Course; slug: string; exams: ExamItem[]; sample: boolean }) {
   const router = useRouter();
   const sp = useSearchParams();
   const { completed, positions, paid, enroll, markComplete, savePosition, touch, addResult } = useProgress();
-  const lessons = useMemo(() => flatLessons(course), [course]);
+  const baseLessons = useMemo(() => flatLessons(course), [course]);
+  const [extra, setExtra] = useState<Record<string, { videoUrl?: string; example?: string }>>({});
+  const lessons = useMemo(() => baseLessons.map((l) => ({ ...l, ...(extra[l.id] ?? {}) })), [baseLessons, extra]);
   const lessonId = sp.get("lesson") ?? (lessons.find((l) => !completed.includes(l.id)) ?? lessons[0]).id;
   const idx = Math.max(0, lessons.findIndex((l) => l.id === lessonId));
   const lesson = lessons[idx];
   const module = course.modules.find((m) => m.id === lesson.moduleId)!;
+  const moduleExam = exams.find((e) => e.moduleId === module.id);
   const [tab, setTab] = useState<Tab>("overview");
   const [startAt, setStartAt] = useState(0);
   const locked = course.premium && !paid.includes(course.code);
+
+  // Real mode: load this lesson's video and practical example (RLS only returns them to students with access).
+  useEffect(() => {
+    if (sample || locked) return;
+    const sb = getSupabase();
+    if (!sb) return;
+    let alive = true;
+    (async () => {
+      const { data } = await sb.from("lessons").select("video_url,practical_example").eq("id", lesson.id).maybeSingle();
+      if (!alive || !data) return;
+      let url: string | undefined = data.video_url || undefined;
+      if (url && !/^https?:\/\//.test(url)) {
+        const signed = await sb.storage.from("videos").createSignedUrl(url, 3600);
+        url = signed.data?.signedUrl;
+      }
+      setExtra((e) => ({ ...e, [lesson.id]: { videoUrl: url, example: data.practical_example || undefined } }));
+    })();
+    return () => { alive = false; };
+  }, [lesson.id, sample, locked]);
 
   // Resume position is captured once per lesson so autosave doesn't re-trigger it.
   useEffect(() => {
@@ -119,14 +160,16 @@ export default function Learn({ slug }: { slug: string }) {
           </div>
           <div className="p-6" role="tabpanel">
             {tab === "overview" && (<><h2 className="font-bold">About this lesson</h2><p className="mt-2 text-sm leading-relaxed text-slate-600">{lesson.summary}</p>
-              {!lesson.videoUrl && <p className="mt-4 rounded-xl bg-brand-50 p-3 text-xs text-brand-800">This lesson currently uses the built-in animated explainer. Administrators can replace it with an uploaded video.</p>}</>)}
+              {!lesson.videoUrl && <p className="mt-4 rounded-xl bg-brand-50 p-3 text-xs text-brand-800">This lesson uses the built-in animated explainer.</p>}</>)}
             {tab === "objectives" && (<><h2 className="font-bold">By the end you will be able to</h2><ul className="mt-3 space-y-2">{lesson.objectives.map((o) => <li key={o} className="flex gap-2 text-sm text-slate-700"><CheckCircle2 size={18} className="shrink-0 text-emerald-500" />{o}</li>)}</ul></>)}
             {tab === "notes" && (<><h2 className="font-bold">Lesson notes</h2><p className="mt-2 text-sm leading-relaxed text-slate-600">{lesson.summary}</p><button className="btn-outline mt-4" onClick={downloadNotes}><Download size={16} /> Download notes</button>
               <p className="mt-3 text-xs text-slate-500">More lecture notes and PDFs for this course are in <Link href={`/dashboard/materials?course=${slug}`} className="font-semibold text-brand-600 hover:underline">Study Materials</Link>.</p></>)}
-            {tab === "practical" && (<><h2 className="font-bold">Practical example</h2><pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-xl bg-navy-900 p-4 text-sm text-slate-100">{lesson.example}</pre><p className="mt-3 text-xs text-slate-500">Try it yourself, then ask the <Link href="/dashboard/ai-tutor" className="font-semibold text-brand-600 hover:underline">AI Tutor</Link> if you get stuck.</p></>)}
+            {tab === "practical" && (<><h2 className="font-bold">Practical example</h2><pre className="mt-3 overflow-x-auto whitespace-pre-wrap rounded-xl bg-navy-900 p-4 text-sm text-slate-100">{lesson.example || "No practical example has been added for this lesson yet."}</pre><p className="mt-3 text-xs text-slate-500">Try it yourself, then ask the <Link href="/dashboard/ai-tutor" className="font-semibold text-brand-600 hover:underline">AI Tutor</Link> if you get stuck.</p></>)}
             {tab === "quiz" && (
-              <QuizRunner key={module.id} title={`${module.title} — quiz`} questions={module.quiz}
+              moduleExam ? (
+              <QuizRunner key={moduleExam.id} title={`${module.title} — quiz`} questions={moduleExam.questions} remoteExamId={moduleExam.remote ? moduleExam.id : undefined}
                 onFinish={(o) => addResult({ courseCode: course.code, title: `${module.title} quiz`, score: o.score, total: o.total, percent: o.percent, durationSec: o.durationSec })} />
+              ) : <p className="text-sm text-slate-500">No quiz has been added for this module yet.</p>
             )}
           </div>
         </div>
@@ -159,7 +202,7 @@ export default function Learn({ slug }: { slug: string }) {
                   })}
                   <li>
                     <button onClick={() => go(m.lessons[m.lessons.length - 1].id, "quiz")} className="flex w-full items-center gap-3 px-5 py-3 text-left text-sm text-slate-500 hover:bg-slate-50">
-                      <HelpCircle size={18} className="shrink-0" /> Module quiz · {m.quiz.length} questions
+                      <HelpCircle size={18} className="shrink-0" /> Module quiz
                     </button>
                   </li>
                 </ul>

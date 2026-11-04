@@ -14,7 +14,7 @@ export interface Lesson {
   duration: number; // seconds
   summary: string;
   objectives: string[];
-  example: string;
+  example?: string;
   videoUrl?: string; // MP4 / HLS / Cloudflare Stream URL once uploaded
   scene: "circuit" | "code" | "robot" | "network" | "data" | "sensor";
 }
@@ -27,18 +27,19 @@ export interface Module {
 }
 
 export interface Course {
+  id?: string; // database id (undefined for built-in sample courses)
   code: string;
   title: string;
   level: Level;
   semester: Semester;
   units: number;
   description: string;
-  instructor: string;
+  instructor?: string;
   premium: boolean;
   price: number; // Naira
-  rating: number;
-  students: number;
-  tag: string;
+  rating?: number;
+  students?: number;
+  tag?: string;
   modules: Module[];
 }
 
@@ -49,6 +50,18 @@ export interface QuizQuestion {
   options?: string[];
   answer: string; // for mcq: option text; tf: "True"/"False"; short: accepted keyword(s) separated by |
   explanation: string;
+}
+
+/** A quiz or examination ready to run. `remote` exams are marked on the server; sample ones locally. */
+export interface ExamItem {
+  id: string;
+  courseCode: string;
+  courseTitle: string;
+  title: string;
+  timeLimitSec?: number;
+  moduleId?: string;
+  questions: QuizQuestion[];
+  remote: boolean;
 }
 
 export const LEVELS: { level: Level; title: string; blurb: string; color: string }[] = [

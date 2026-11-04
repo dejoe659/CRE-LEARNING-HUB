@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { ProgressProvider } from "@/lib/progress";
+import { ContentProvider } from "@/lib/content";
 
 export const metadata: Metadata = {
   title: { default: "CRE Learning Hub – Computer & Robotics Education", template: "%s · CRE Learning Hub" },
@@ -24,7 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body style={{ fontFamily: "Poppins, Inter, system-ui, sans-serif" }}>
         <AuthProvider>
-          <ProgressProvider>{children}</ProgressProvider>
+          <ContentProvider>
+            <ProgressProvider>{children}</ProgressProvider>
+          </ContentProvider>
         </AuthProvider>
       </body>
     </html>

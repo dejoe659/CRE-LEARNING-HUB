@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { CheckCircle2, Lock, PlayCircle } from "lucide-react";
-import { COURSES, courseSlug, flatLessons, fmtDuration } from "@/lib/data";
+import { courseSlug, flatLessons, fmtDuration } from "@/lib/data";
+import { useContent } from "@/lib/content";
 import { useProgress } from "@/lib/progress";
 import { SceneThumb } from "@/components/LessonScene";
 
 export default function Videos() {
+  const { courses: COURSES } = useContent();
   const { enrolled, completed, positions, paid } = useProgress();
   const [scope, setScope] = useState<"enrolled" | "all">("enrolled");
   const list = useMemo(
@@ -15,7 +17,7 @@ export default function Videos() {
       COURSES.filter((c) => scope === "all" || enrolled.includes(c.code)).flatMap((c) =>
         flatLessons(c).map((l) => ({ ...l, course: c }))
       ),
-    [scope, enrolled]
+    [COURSES, scope, enrolled]
   );
   return (
     <div>

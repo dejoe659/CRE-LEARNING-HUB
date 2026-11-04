@@ -1,21 +1,23 @@
-import { notFound } from "next/navigation";
+"use client";
+
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, Clock, FileText, PlayCircle, Star, Users } from "lucide-react";
-import { COURSES, courseSlug, fmtDuration, formatNaira, getCourse } from "@/lib/data";
+import { courseSlug, fmtDuration, formatNaira } from "@/lib/data";
+import { useContent } from "@/lib/content";
 import EnrollPanel from "./EnrollPanel";
 
-export function generateStaticParams() {
-  return COURSES.map((c) => ({ slug: courseSlug(c.code) }));
-}
-
-export function generateMetadata({ params }: { params: { slug: string } }) {
-  const c = getCourse(params.slug);
-  return { title: c ? `${c.code} ${c.title}` : "Course" };
-}
-
-export default function CourseDetails({ params }: { params: { slug: string } }) {
-  const course = getCourse(params.slug);
-  if (!course) notFound();
+export default function CourseDetails() {
+  const { slug } = useParams<{ slug: string }>();
+  const { bySlug, loading, sample } = useContent();
+  const course = bySlug(slug);
+  if (!course)
+    return (
+      <div className="section py-24 text-center">
+        <h1 className="text-2xl font-extrabold">{loading ? "Loading course…" : "Course not found"}</h1>
+        {!loading && <Link href="/courses" className="btn-primary mt-6">Browse courses</Link>}
+      </div>
+    );
   const lessonCount = course.modules.reduce((a, m) => a + m.lessons.length, 0);
   const total = course.modules.reduce((a, m) => a + m.lessons.reduce((x, l) => x + l.duration, 0), 0);
 
@@ -34,8 +36,8 @@ export default function CourseDetails({ params }: { params: { slug: string } }) 
           <h1 className="mt-3 max-w-3xl text-3xl font-extrabold sm:text-4xl">{course.code}: {course.title}</h1>
           <p className="mt-3 max-w-2xl text-slate-200">{course.description}</p>
           <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-200">
-            <span className="flex items-center gap-1.5"><Star size={15} className="fill-amber-400 text-amber-400" />{course.rating}</span>
-            <span className="flex items-center gap-1.5"><Users size={15} />{course.students.toLocaleString()} students</span>
+            {course.rating !== undefined && <span className="flex items-center gap-1.5"><Star size={15} className="fill-amber-400 text-amber-400" />{course.rating}</span>}
+            {course.students !== undefined && <span className="flex items-center gap-1.5"><Users size={15} />{course.students.toLocaleString()} students</span>}
             <span className="flex items-center gap-1.5"><PlayCircle size={15} />{lessonCount} video lessons</span>
             <span className="flex items-center gap-1.5"><Clock size={15} />{Math.round(total / 60)} min</span>
           </div>
@@ -55,7 +57,7 @@ export default function CourseDetails({ params }: { params: { slug: string } }) 
 
           <div className="card p-6">
             <h2 className="text-lg font-bold">Course content</h2>
-            <p className="text-sm text-slate-500">{course.modules.length} modules · {lessonCount} lessons · quiz after every module</p>
+            <p className="text-sm text-slate-500">{course.modules.length} modules · {lessonCount} lessons · </p>
             <div className="mt-4 space-y-3">
               {course.modules.map((m, i) => (
                 <details key={m.id} open={i === 0} className="group rounded-xl border border-slate-200">
@@ -70,7 +72,7 @@ export default function CourseDetails({ params }: { params: { slug: string } }) 
                         <span className="text-xs text-slate-500">{fmtDuration(l.duration)}</span>
                       </li>
                     ))}
-                    <li className="flex items-center gap-2 px-4 py-3 text-sm text-slate-500"><FileText size={16} /> Module quiz · {m.quiz.length} questions</li>
+                    <li className="flex items-center gap-2 px-4 py-3 text-sm text-slate-500"><FileText size={16} /> Module quiz</li>
                   </ul>
                 </details>
               ))}
@@ -89,9 +91,11 @@ export default function CourseDetails({ params }: { params: { slug: string } }) 
               <li>• Quizzes after every topic</li>
               <li>• Progress saved automatically</li>
             </ul>
-            <p className="mt-5 rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
-              Sample course for demonstration. Not an official university curriculum.
-            </p>
+            {sample && (
+              <p className="mt-5 rounded-xl bg-slate-50 p-3 text-xs text-slate-500">
+                Sample course for demonstration. Not an official university curriculum.
+              </p>
+            )}
           </div>
         </aside>
       </div>

@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import {
   ArrowRight, Bot, ClipboardCheck, FileText, MonitorPlay, PlayCircle, Smartphone, Sparkles,
@@ -5,7 +7,8 @@ import {
 } from "lucide-react";
 import RobotHero from "@/components/RobotHero";
 import CourseCard from "@/components/CourseCard";
-import { COURSES, LEVELS, TESTIMONIALS, coursesFor } from "@/lib/data";
+import { LEVELS, TESTIMONIALS } from "@/lib/data";
+import { useContent } from "@/lib/content";
 
 const why = [
   { icon: MonitorPlay, title: "Animated video lessons", text: "Abstract ideas become visual stories — circuits, algorithms and robots animated step by step." },
@@ -24,7 +27,8 @@ const steps = [
 ];
 
 export default function Home() {
-  const featured = COURSES.filter((c) => ["SMP 101", "SMP 201", "SMP 204", "SMP 303", "SMP 401", "SMP 403"].includes(c.code));
+  const { courses, settings, sample, loading } = useContent();
+  const featured = courses.slice(0, 6);
   return (
     <>
       {/* HERO */}
@@ -36,14 +40,12 @@ export default function Home() {
               <Sparkles size={13} /> Computer &amp; Robotics Education · 100–400 Level
             </span>
             <h1 className="mt-5 text-4xl font-extrabold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl">
-              Transforming the Way You Learn{" "}
               <span className="bg-gradient-to-r from-brand-600 to-accent-500 bg-clip-text text-transparent">
-                Computer and Robotics Education.
+                {settings.hero_title}
               </span>
             </h1>
             <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-600">
-              Understand every course through animated visual explanations, hands-on practical examples, downloadable
-              notes, quizzes and examinations — all in one modern learning platform.
+              {settings.hero_subtitle}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/courses" className="btn-primary px-7 py-3.5 text-base">
@@ -54,7 +56,7 @@ export default function Home() {
               </Link>
             </div>
             <dl className="mt-10 grid max-w-md grid-cols-3 gap-4">
-              {[["4", "Academic levels"], ["8", "Semesters"], [`${COURSES.length}+`, "Sample courses"]].map(([n, l]) => (
+              {[["4", "Academic levels"], ["8", "Semesters"], [String(courses.length), sample ? "Sample courses" : "Courses"]].map(([n, l]) => (
                 <div key={l}>
                   <dt className="text-2xl font-extrabold text-brand-600">{n}</dt>
                   <dd className="text-xs text-slate-500">{l}</dd>
@@ -87,7 +89,7 @@ export default function Home() {
                 <h3 className="mt-5 text-lg font-bold">{l.title}</h3>
                 <p className="mt-1 text-sm text-white/80">{l.blurb}</p>
                 <p className="mt-5 flex items-center gap-1 text-sm font-semibold">
-                  {coursesFor(l.level).length} sample courses <ArrowRight size={16} className="transition group-hover:translate-x-1" />
+                  {courses.filter((c) => c.level === l.level).length} {sample ? "sample " : ""}courses <ArrowRight size={16} className="transition group-hover:translate-x-1" />
                 </p>
               </div>
             </Link>
@@ -101,16 +103,24 @@ export default function Home() {
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <h2 className="text-3xl font-extrabold sm:text-4xl">Featured courses</h2>
-              <p className="mt-2 text-slate-600">Sample courses that show how lessons, quizzes and notes fit together.</p>
+              <p className="mt-2 text-slate-600">Start learning with animated lessons, notes and quizzes.</p>
             </div>
             <Link href="/courses" className="btn-outline">View all courses <ArrowRight size={16} /></Link>
           </div>
-          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {featured.map((c) => <CourseCard key={c.code} course={c} />)}
-          </div>
-          <p className="mt-6 text-center text-xs text-slate-500">
-            Sample course catalogue for demonstration — not an official university curriculum.
-          </p>
+          {featured.length === 0 ? (
+            <div className="mt-10 rounded-2xl border border-dashed border-slate-300 p-12 text-center text-sm text-slate-500">
+              {loading ? "Loading courses…" : "Courses are being added. Please check back soon."}
+            </div>
+          ) : (
+            <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {featured.map((c) => <CourseCard key={c.code} course={c} />)}
+            </div>
+          )}
+          {sample && (
+            <p className="mt-6 text-center text-xs text-slate-500">
+              Sample course catalogue for demonstration — not an official university curriculum.
+            </p>
+          )}
         </div>
       </section>
 

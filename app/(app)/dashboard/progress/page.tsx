@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { CheckCircle2, Circle } from "lucide-react";
-import { COURSES, courseSlug } from "@/lib/data";
+import { courseSlug } from "@/lib/data";
+import { useContent } from "@/lib/content";
 import { useProgress } from "@/lib/progress";
 import { courseProgress } from "@/lib/stats";
 
 export default function ProgressPage() {
+  const { courses: COURSES } = useContent();
   const { enrolled, completed } = useProgress();
   const mine = COURSES.filter((c) => enrolled.includes(c.code));
   const total = mine.reduce((a, c) => a + c.modules.reduce((x, m) => x + m.lessons.length, 0), 0);

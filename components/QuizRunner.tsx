@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, ChevronRight, Clock, RotateCcw, Trophy, XCircle } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { CheckCircle2, ChevronRight, Clock, Loader2, RotateCcw, Trophy, XCircle } from "lucide-react";
 import type { QuizQuestion } from "@/lib/data";
+import { getSupabase } from "@/lib/supabase/client";
 
 export interface QuizOutcome {
   score: number;
@@ -11,7 +12,9 @@ export interface QuizOutcome {
   durationSec: number;
 }
 
-/** Marks one answer. Short answers accept any of the `|`-separated keywords (case-insensitive). */
+interface Review { correct: boolean; answer: string; explanation: string }
+
+/** Local marking for built-in sample quizzes. Short answers accept any `|`-separated keyword. */
 export function markAnswer(q: QuizQuestion, given: string): boolean {
   const g = given.trim().toLowerCase();
   if (!g) return false;
@@ -21,35 +24,89 @@ export function markAnswer(q: QuizQuestion, given: string): boolean {
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
+/**
+ * Runs a quiz/exam. With `remoteExamId` the answers are checked and marked by the database
+ * (functions check_answer / grade_attempt / review_exam), so correct answers never reach the browser early.
+ */
 export default function QuizRunner({
-  title, questions, mode = "practice", timeLimitSec, onFinish, onClose,
+  title, questions, mode = "practice", timeLimitSec, remoteExamId, onFinish, onClose,
 }: {
   title: string;
   questions: QuizQuestion[];
   mode?: "practice" | "exam";
   timeLimitSec?: number;
+  remoteExamId?: string;
   onFinish?: (o: QuizOutcome) => void;
   onClose?: () => void;
 }) {
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [revealed, setRevealed] = useState<Record<string, boolean>>({});
+  const [feedback, setFeedback] = useState<Record<string, Review>>({});
   const [finished, setFinished] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const [remaining, setRemaining] = useState(timeLimitSec ?? 0);
+  const [outcome, setOutcome] = useState<QuizOutcome | null>(null);
+  const [review, setReview] = useState<Record<string, Review>>({});
   const start = useRef(Date.now());
-  const outcomeRef = useRef<QuizOutcome | null>(null);
+  const submitting = useRef(false);
 
   const q = questions[idx];
   const exam = mode === "exam";
 
-  const finish = useCallback(() => {
-    if (outcomeRef.current) return;
-    const score = questions.filter((x) => markAnswer(x, answers[x.id] ?? "")).length;
-    const o = { score, total: questions.length, percent: Math.round((score / questions.length) * 100), durationSec: Math.round((Date.now() - start.current) / 1000) };
-    outcomeRef.current = o;
-    setFinished(true);
-    onFinish?.(o);
-  }, [answers, questions, onFinish]);
+  const localReview = useCallback(
+    (x: QuizQuestion): Review => ({ correct: markAnswer(x, answers[x.id] ?? ""), answer: x.answer.split("|")[0], explanation: x.explanation }),
+    [answers]
+  );
+
+  const finish = useCallback(async () => {
+    if (submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    setError("");
+    const durationSec = Math.round((Date.now() - start.current) / 1000);
+    try {
+      let o: QuizOutcome;
+      const rv: Record<string, Review> = {};
+      if (remoteExamId) {
+        const sb = getSupabase()!;
+        const g = await sb.rpc("grade_attempt", { p_exam: remoteExamId, p_answers: answers, p_duration: durationSec });
+        if (g.error) throw new Error(g.error.message);
+        const a = g.data as { score: number; total: number; percent: number };
+        o = { score: a.score, total: a.total, percent: a.percent, durationSec };
+        const r = await sb.rpc("review_exam", { p_exam: remoteExamId, p_answers: answers });
+        if (!r.error && Array.isArray(r.data))
+          (r.data as { id: string; correct: boolean; answer: string; explanation: string }[]).forEach((x) => (rv[x.id] = x));
+      } else {
+        const score = questions.filter((x) => markAnswer(x, answers[x.id] ?? "")).length;
+        o = { score, total: questions.length, percent: Math.round((score / questions.length) * 100), durationSec };
+        questions.forEach((x) => (rv[x.id] = localReview(x)));
+      }
+      setReview(rv);
+      setOutcome(o);
+      setFinished(true);
+      onFinish?.(o);
+    } catch (e) {
+      submitting.current = false;
+      setError(e instanceof Error ? e.message : "Could not submit. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }, [answers, questions, remoteExamId, localReview, onFinish]);
+
+  const checkNow = async () => {
+    if (!q) return;
+    if (!remoteExamId) {
+      setFeedback({ ...feedback, [q.id]: localReview(q) });
+      return;
+    }
+    setBusy(true);
+    setError("");
+    const { data, error } = await getSupabase()!.rpc("check_answer", { p_question: q.id, p_answer: answers[q.id] ?? "" });
+    setBusy(false);
+    if (error) return setError(error.message);
+    setFeedback({ ...feedback, [q.id]: data as Review });
+  };
 
   useEffect(() => {
     if (!timeLimitSec || finished) return;
@@ -60,9 +117,6 @@ export default function QuizRunner({
   useEffect(() => {
     if (timeLimitSec && remaining <= 0 && !finished) finish();
   }, [remaining, timeLimitSec, finished, finish]);
-
-  const outcome = outcomeRef.current;
-  const correctNow = useMemo(() => (q ? markAnswer(q, answers[q.id] ?? "") : false), [q, answers]);
 
   if (!questions.length) return <div className="card p-8 text-center text-sm text-slate-500">No questions have been added yet.</div>;
 
@@ -78,18 +132,19 @@ export default function QuizRunner({
         </div>
         <ol className="mt-6 space-y-3">
           {questions.map((x, i) => {
-            const ok = markAnswer(x, answers[x.id] ?? "");
+            const rv = review[x.id];
+            const ok = rv?.correct ?? false;
             return (
               <li key={x.id} className={`rounded-xl border p-4 text-sm ${ok ? "border-emerald-200 bg-emerald-50" : "border-rose-200 bg-rose-50"}`}>
                 <p className="flex items-start gap-2 font-semibold">{ok ? <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-600" /> : <XCircle size={18} className="mt-0.5 shrink-0 text-rose-600" />}{i + 1}. {x.question}</p>
-                <p className="mt-1 pl-7 text-slate-600">Your answer: <em>{answers[x.id] || "—"}</em>{!ok && <> · Correct: <strong>{x.answer.split("|")[0]}</strong></>}</p>
-                <p className="mt-1 pl-7 text-xs text-slate-500">{x.explanation}</p>
+                <p className="mt-1 pl-7 text-slate-600">Your answer: <em>{answers[x.id] || "—"}</em>{!ok && rv?.answer && <> · Correct: <strong>{rv.answer}</strong></>}</p>
+                {rv?.explanation && <p className="mt-1 pl-7 text-xs text-slate-500">{rv.explanation}</p>}
               </li>
             );
           })}
         </ol>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <button className="btn-outline" onClick={() => { outcomeRef.current = null; start.current = Date.now(); setAnswers({}); setRevealed({}); setIdx(0); setFinished(false); setRemaining(timeLimitSec ?? 0); }}><RotateCcw size={16} /> Retake</button>
+          <button className="btn-outline" onClick={() => { submitting.current = false; start.current = Date.now(); setAnswers({}); setFeedback({}); setReview({}); setOutcome(null); setIdx(0); setFinished(false); setRemaining(timeLimitSec ?? 0); }}><RotateCcw size={16} /> Retake</button>
           {onClose && <button className="btn-primary" onClick={onClose}>Done</button>}
         </div>
       </div>
@@ -97,7 +152,8 @@ export default function QuizRunner({
   }
 
   const given = answers[q.id] ?? "";
-  const isRevealed = !exam && revealed[q.id];
+  const fb = feedback[q.id];
+  const isRevealed = !exam && !!fb;
   const options = q.type === "tf" ? ["True", "False"] : q.options ?? [];
   const last = idx === questions.length - 1;
 
@@ -124,7 +180,7 @@ export default function QuizRunner({
         ) : (
           options.map((o) => {
             const picked = given === o;
-            const showOk = isRevealed && o.toLowerCase() === q.answer.toLowerCase();
+            const showOk = isRevealed && o.toLowerCase() === (fb?.answer ?? "").toLowerCase();
             const showBad = isRevealed && picked && !showOk;
             return (
               <button key={o} disabled={isRevealed} onClick={() => setAnswers({ ...answers, [q.id]: o })}
@@ -137,19 +193,20 @@ export default function QuizRunner({
         )}
       </div>
 
-      {isRevealed && (
-        <div className={`mt-4 rounded-xl p-4 text-sm ${correctNow ? "bg-emerald-50 text-emerald-900" : "bg-rose-50 text-rose-900"}`} role="status">
-          <p className="font-semibold">{correctNow ? "Correct!" : `Not quite — answer: ${q.answer.split("|")[0]}`}</p>
-          <p className="mt-1 text-xs opacity-80">{q.explanation}</p>
+      {isRevealed && fb && (
+        <div className={`mt-4 rounded-xl p-4 text-sm ${fb.correct ? "bg-emerald-50 text-emerald-900" : "bg-rose-50 text-rose-900"}`} role="status">
+          <p className="font-semibold">{fb.correct ? "Correct!" : `Not quite — answer: ${fb.answer}`}</p>
+          {fb.explanation && <p className="mt-1 text-xs opacity-80">{fb.explanation}</p>}
         </div>
       )}
+      {error && <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700" role="alert">{error}</p>}
 
       <div className="mt-6 flex flex-wrap justify-between gap-3">
-        <button className="btn-ghost" disabled={idx === 0} onClick={() => setIdx(idx - 1)}>Previous</button>
+        <button className="btn-ghost" disabled={idx === 0 || busy} onClick={() => setIdx(idx - 1)}>Previous</button>
         <div className="flex gap-3">
-          {!exam && !isRevealed && <button className="btn-outline" disabled={!given.trim()} onClick={() => setRevealed({ ...revealed, [q.id]: true })}>Check answer</button>}
+          {!exam && !isRevealed && <button className="btn-outline" disabled={!given.trim() || busy} onClick={checkNow}>{busy && <Loader2 size={14} className="animate-spin" />} Check answer</button>}
           {last ? (
-            <button className="btn-primary" onClick={finish}>Submit {exam ? "exam" : "quiz"}</button>
+            <button className="btn-primary" disabled={busy} onClick={finish}>{busy && <Loader2 size={16} className="animate-spin" />} Submit {exam ? "exam" : "quiz"}</button>
           ) : (
             <button className="btn-primary" onClick={() => setIdx(idx + 1)}>Next <ChevronRight size={16} /></button>
           )}

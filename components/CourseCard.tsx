@@ -25,15 +25,15 @@ export default function CourseCard({ course, progress }: { course: Course; progr
       </div>
       <div className="flex flex-1 flex-col p-5">
         <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
-          {course.code} · {course.tag}
+          {course.code}{course.tag ? ` · ${course.tag}` : ""}
         </p>
         <h3 className="mt-1 text-base font-bold leading-snug group-hover:text-brand-600">{course.title}</h3>
         <p className="mt-2 line-clamp-2 text-sm text-slate-500">{course.description}</p>
         <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-4 text-xs text-slate-500">
           <span className="flex items-center gap-1"><BookOpen size={13} /> {lessons.length} lessons</span>
           <span className="flex items-center gap-1"><Clock size={13} /> {mins} min</span>
-          <span className="flex items-center gap-1"><Star size={13} className="fill-amber-400 text-amber-400" /> {course.rating}</span>
-          <span className="flex items-center gap-1"><Users size={13} /> {course.students.toLocaleString()}</span>
+          {course.rating !== undefined && <span className="flex items-center gap-1"><Star size={13} className="fill-amber-400 text-amber-400" /> {course.rating}</span>}
+          {course.students !== undefined && <span className="flex items-center gap-1"><Users size={13} /> {course.students.toLocaleString()}</span>}
         </div>
         {progress !== undefined && (
           <div className="mt-4">

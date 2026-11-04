@@ -4,11 +4,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import CourseCard from "@/components/CourseCard";
-import { COURSES, LEVELS, Level, Semester } from "@/lib/data";
+import { LEVELS, Level, Semester } from "@/lib/data";
+import { useContent } from "@/lib/content";
 
 export default function Catalogue({ basePath = "/courses" }: { basePath?: string }) {
   const router = useRouter();
   const sp = useSearchParams();
+  const { courses: COURSES, sample, loading } = useContent();
   const level = (Number(sp.get("level")) || 0) as Level | 0;
   const semester = (Number(sp.get("semester")) || 0) as Semester | 0;
   const [q, setQ] = useState("");
@@ -30,7 +32,7 @@ export default function Catalogue({ basePath = "/courses" }: { basePath?: string
           (price === "all" || (price === "free" ? !c.premium : c.premium)) &&
           (q.trim() === "" || `${c.code} ${c.title} ${c.tag}`.toLowerCase().includes(q.toLowerCase()))
       ),
-    [level, semester, price, q]
+    [COURSES, level, semester, price, q]
   );
 
   const groups = ([1, 2] as Semester[])
@@ -49,8 +51,7 @@ export default function Catalogue({ basePath = "/courses" }: { basePath?: string
         <div className="section">
           <h1 className="text-3xl font-extrabold sm:text-4xl">Course catalogue</h1>
           <p className="mt-2 max-w-2xl text-slate-200">
-            Select an academic level and semester. These are <strong>sample courses</strong> for demonstration — not an
-            official university curriculum.
+            Select an academic level and semester.{sample && <> These are <strong>sample courses</strong> for demonstration — not an official university curriculum.</>}
           </p>
         </div>
       </div>
@@ -95,8 +96,8 @@ export default function Catalogue({ basePath = "/courses" }: { basePath?: string
         {/* results */}
         {groups.length === 0 ? (
           <div className="card mt-10 p-12 text-center">
-            <p className="text-lg font-bold">No courses match your filters</p>
-            <p className="mt-1 text-sm text-slate-500">Try clearing the search or choosing another level.</p>
+            <p className="text-lg font-bold">{loading ? "Loading courses…" : COURSES.length === 0 ? "No courses have been published yet" : "No courses match your filters"}</p>
+            <p className="mt-1 text-sm text-slate-500">{COURSES.length === 0 ? "Please check back soon." : "Try clearing the search or choosing another level."}</p>
             <button className="btn-primary mt-5" onClick={() => { setQ(""); setPrice("all"); router.push(basePath); }}>Reset filters</button>
           </div>
         ) : (
