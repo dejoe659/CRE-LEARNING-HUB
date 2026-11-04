@@ -41,7 +41,10 @@ export default function Navbar() {
         </nav>
         <div className="hidden items-center gap-2 md:flex">
           {user ? (
-            <Link href="/dashboard" className="btn-primary">Go to Dashboard</Link>
+            <>
+              {user.role === "admin" && <Link href="/admin" className="btn-outline">Admin</Link>}
+              <Link href="/dashboard" className="btn-primary">Go to Dashboard</Link>
+            </>
           ) : (
             <>
               <Link href="/login" className="btn-ghost">Login</Link>
@@ -69,7 +72,10 @@ export default function Navbar() {
           </nav>
           <div className="mt-2 grid grid-cols-2 gap-2">
             {user ? (
-              <Link href="/dashboard" onClick={() => setOpen(false)} className="btn-primary col-span-2">Go to Dashboard</Link>
+              <>
+                {user.role === "admin" && <Link href="/admin" onClick={() => setOpen(false)} className="btn-outline col-span-2">Admin dashboard</Link>}
+                <Link href="/dashboard" onClick={() => setOpen(false)} className="btn-primary col-span-2">Go to Dashboard</Link>
+              </>
             ) : (
               <>
                 <Link href="/login" onClick={() => setOpen(false)} className="btn-outline">Login</Link>
