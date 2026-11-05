@@ -46,9 +46,9 @@ export default function DashboardHome() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {stats.map(({ label, value, icon: Icon, tone }) => (
-          <div key={label} className="card flex items-center gap-4 p-5">
+          <div key={label} className="card flex flex-col items-start gap-3 p-4 sm:flex-row sm:items-center sm:gap-4 sm:p-5">
             <span className={`flex h-12 w-12 items-center justify-center rounded-2xl ${tone}`}><Icon size={22} /></span>
             <div><p className="text-2xl font-extrabold">{value}</p><p className="text-xs text-slate-500">{label}</p></div>
           </div>

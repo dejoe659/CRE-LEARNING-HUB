@@ -3,14 +3,19 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { ProgressProvider } from "@/lib/progress";
 import { ContentProvider } from "@/lib/content";
+import RegisterSW from "@/components/RegisterSW";
 
 export const metadata: Metadata = {
   title: { default: "CRE Learning Hub – Computer & Robotics Education", template: "%s · CRE Learning Hub" },
   description:
     "Animated video lessons, practical guides, quizzes and examinations for Computer and Robotics Education students, 100 to 400 Level.",
+  applicationName: "CRE Learning Hub",
+  appleWebApp: { capable: true, title: "CRE Hub", statusBarStyle: "black-translucent" },
+  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+  formatDetection: { telephone: false },
 };
 
-export const viewport: Viewport = { themeColor: "#2563EB", width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { themeColor: "#2563EB", width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -27,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <ContentProvider>
             <ProgressProvider>{children}</ProgressProvider>
+            <RegisterSW />
           </ContentProvider>
         </AuthProvider>
       </body>
